@@ -9,6 +9,10 @@ def load_config():
             return json.load(f)
     return {}
 
+def get_account_id():
+    config = load_config()
+    return config.get("account_id")
+
 def save_config(data):
     with open(CONFIG_FILE, "w") as f:
         json.dump(data, f, indent=2)
