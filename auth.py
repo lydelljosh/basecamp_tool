@@ -3,8 +3,7 @@ import socketserver
 import webbrowser
 import requests
 from urllib.parse import urlparse, parse_qs
-from utils import save_config, load_config, print_success, print_error
-
+from utils.utils import save_config, load_config, print_success, print_error
 
 def exchange_code_for_token(code, client_id, client_secret, redirect_uri):
     token_url = "https://launchpad.37signals.com/authorization/token"

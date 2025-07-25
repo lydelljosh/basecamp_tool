@@ -4,7 +4,7 @@ import json
 import requests
 from datetime import datetime
 from auth import get_auth_headers
-from utils import print_success, print_error
+from utils.utils import save_config, load_config, print_success, print_error
 
 def sanitize(name: str) -> str:
     return "".join(c if c.isalnum() or c in (" ", "-", "_") else "_" for c in (name or ""))[:180]
