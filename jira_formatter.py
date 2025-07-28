@@ -1,6 +1,6 @@
 import os
 import csv
-from bs4 import BeautifulSoup  # <-- Added for HTML cleanup
+from bs4 import BeautifulSoup
 from auth import get_auth_headers
 from utils.utils import print_success
 from utils.basecamp_api import fetch_todo_detail, fetch_comments
@@ -34,24 +34,25 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                     if not detail:
                         continue
 
+                    # Use description field, not content
+                    raw_description = detail.get("description") or detail.get("description_html", "")
+                    soup = BeautifulSoup(raw_description, "html.parser")
+                    clean_description = soup.get_text(separator=" ", strip=True)
+
+                    # Format comments
                     comments = fetch_comments(account_id, bucket_id, todo_id, headers)
                     comment_blocks = []
                     for c in comments:
                         name = c.get("creator", {}).get("name", "Unknown")
                         email = c.get("creator", {}).get("email_address", "")
                         created = c.get("created_at", "")
-
-                        # Clean HTML from comment content
                         raw_text = c.get("content") or c.get("content_html", "")
-                        soup = BeautifulSoup(raw_text, "html.parser")
-                        text = soup.get_text(separator=" ", strip=True)
-
+                        text = BeautifulSoup(raw_text, "html.parser").get_text(separator=" ", strip=True)
                         if text:
-                            comment_blocks.append(
-                                f"{name} ({email}) at {created}:\n> {text}"
-                            )
+                            comment_blocks.append(f"{name} ({email}) at {created}:\n> {text}")
                     formatted_comments = "\n\n".join(comment_blocks)
 
+                    # Format attachments
                     attachments = detail.get("attachments", [])
                     attachment_lines = []
                     for a in attachments:
@@ -64,7 +65,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                         "Project": project,
                         "List": list_title,
                         "Todo Title": detail.get("title", ""),
-                        "Description": detail.get("content", ""),
+                        "Description": clean_description,
                         "Assignees": ", ".join([p.get("name") for p in detail.get("assignees", [])]),
                         "Created By": detail.get("creator", {}).get("name"),
                         "Due Date": detail.get("due_on") or "",
