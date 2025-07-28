@@ -14,7 +14,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
     output_path = os.path.join(run_dir, "todos_jira.csv")
     with open(output_path, mode="w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=[
-            "Project", "List", "Todo Title", "Description", "Assignees",
+            "Project", "List", "Group", "Todo Title", "Description", "Assignees",
             "Created By", "Due Date", "Completed", "Comments",
             "Attachments", "App URL"
         ])
@@ -64,6 +64,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                     writer.writerow({
                         "Project": project,
                         "List": list_title,
+                        "Group": todo.get("group", ""),
                         "Todo Title": detail.get("title", ""),
                         "Description": clean_description,
                         "Assignees": ", ".join([p.get("name") for p in detail.get("assignees", [])]),
