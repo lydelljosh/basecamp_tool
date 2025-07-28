@@ -4,3 +4,4 @@ config.json
 results/
 .env/
 .venv/
+.DS_Store
