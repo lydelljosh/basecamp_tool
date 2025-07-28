@@ -1,124 +1,128 @@
-# 🧰 Basecamp Tool – Project To-dos & Attachments Extractor
+# Basecamp Tool
 
-This tool allows you to fetch **Basecamp 3 projects**, extract **to-do lists** with full details (assignees, attachments, comments), and **download all related files** into timestamped result folders for audit or offline review.
+This Python-based utility extracts To-dos, comments, and attachments from Basecamp 3 projects and exports the data into a structured CSV format (Jira-compatible). It supports retrieving:
 
----
-
-## 📦 Features
-
-- ✅ Fetch all **active projects** in your account.
-- ✅ Extract **To-do lists** (including title, notes, status, assignees, due dates).
-- ✅ Include **full comment threads** with authors, timestamps, and content.
-- ✅ Download **attachments** from both to-dos and comments.
-- ✅ Output organized in `results/run_YYYYMMDD_HHMMSS/` for every execution.
-- ✅ Modular structure – easy to extend or adapt.
+- All projects and their todo lists
+- Full todo details including:
+  - Description
+  - Assignees
+  - Completion status
+  - Comments (cleanly formatted with names and timestamps)
+  - Attachments (with direct links)
 
 ---
 
-## 📁 Folder Structure
+## 🔧 Features
 
-```
-basecamp_tool/
-│
-├── auth.py                    # Authentication loader from config.json
-├── config.json                # 🔒 Contains your account and token info (add to .gitignore)
-├── dump.py                    # Step 1: Fetch & dump projects (with todoset links)
-├── fetch.py                   # Step 2: Extract todos, comments, attachments (metadata only)
-├── download_attachments.py    # Step 3: Download all files into /results/
-├── main.py                    # Master runner: executes dump → fetch → download
-├── utils.py                   # Common print, sanitize, and helper functions
-│
-├── results/
-│   └── run_20250725_173000/   # Timestamped output folder
-│       ├── projects_dump.json     # Raw project + dock metadata
-│       ├── todos_deep.json        # Enriched todos + comments + attachment metadata
-│       └── attachments/           # Actual downloaded files
-│
-├── .gitignore                 # Ignores config.json, results/, etc.
-└── README.md
-```
+- ✅ Retrieves full To-do details per list
+- ✅ Fetches comments with readable formatting
+- ✅ Downloads and links attachments
+- ✅ Jira-ready CSV output
+- ✅ Custom configuration via `config.json`
+- 🧪 Handles most project formats
 
 ---
 
-## ⚙️ Setup
+## 🚫 Known Limitations
 
-### 1. Install dependencies
+- ❌ **Grouped To-do Lists (e.g. sections like "In Progress", "Bugs") are not accessible** with standard OAuth tokens.
+  - These require **elevated privileges (admin access)** to access the `recordings.json` or `todosets.json` endpoints where group data is exposed.
+
+---
+
+## 📂 Project Structure
 
 ```bash
-pip install requests
+basecamp_tool/
+├── main.py                  # Entry script to fetch and export data
+├── dump.py                  # Dumps all project metadata
+├── fetch.py                 # Fetches todo and list data
+├── jira_formatter.py        # Formats data into a Jira-style CSV
+├── download_attachments.py  # Optional: Downloads attached files (WIP)
+├── utils/
+│   ├── basecamp_api.py      # API wrappers
+│   ├── utils.py             # Utility functions (save/load, logging)
+│   └── __init__.py
+├── config.json              # User tokens and flags
+├── .gitignore               # Git exclusions (includes .DS_Store, /results/)
+└── results/
+    └── run_*/               # Timestamped folders with outputs
 ```
 
-### 2. Create your `config.json`
+---
+
+## 📝 Setup
+
+1. Clone the repository
+2. Set up a virtual environment:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+pip install -r requirements.txt
+```
+
+3. Fill in your `config.json` with the following:
 
 ```json
 {
-  "Account-ID": "YOUR_ACCOUNT_ID",
-  "Authorization": "Bearer YOUR_ACCESS_TOKEN"
+  "client_id": "your-client-id",
+  "client_secret": "your-secret",
+  "redirect_uri": "http://localhost:8888/callback",
+  "access_token": "your-oauth-access-token",
+  "refresh_token": "",
+  "account_id": 12345678,
+  "project_filter": "",
+  "include_completed": false
 }
 ```
 
-> ⚠️ Keep this file **secure** and **never commit** it. Add it to your `.gitignore`.
-
 ---
 
-## ▶️ How to Run
-
-From the root folder, simply run:
+## 🚀 Usage
 
 ```bash
 python main.py
 ```
 
-This will:
-
-1. Save project metadata → `results/run_*/projects_dump.json`
-2. Save enriched todos + comments → `results/run_*/todos_deep.json`
-3. Download attachments to → `results/run_*/attachments/...`
+- This runs the full dump → fetch → export flow
+- Output files will be saved in a new folder inside `results/` with timestamped naming
 
 ---
 
-## 📑 JSON Outputs
+## 🗂 Output
 
-### `projects_dump.json`
-Raw project list with dock sections, including `todoset` URLs.
+Each run generates:
 
-### `todos_deep.json`
-Each project → todolist → todos (with comments & attachments):
-
-```json
-{
-  "Project A": {
-    "Development": [
-      {
-        "title": "Fix Login Bug",
-        "created_by": "John Doe",
-        "assignees": ["Dev Team"],
-        "completed": false,
-        "attachments": [...],
-        "comments": [...]
-      }
-    ]
-  }
-}
-```
+- `projects_dump.json`: Project metadata
+- `todos_deep.json`: Detailed todos + metadata
+- `todos_jira.csv`: Final CSV, ready for Jira import
 
 ---
 
-## 📁 Attachments Folder
+## ❗ Admin Access Requirement
 
-Downloaded files will be stored by:
-
-```
-attachments/<Project>/<Todolist>/<Todo Title>/<filename>
-```
+To support **grouped to-do list** structures (e.g. lists with sections like "Backlog", "Completed", etc.), this script **requires an admin token** with elevated permissions. Without it, only top-level (ungrouped) todo lists are retrievable.
 
 ---
 
-## 🧼 To Do / Suggestions
+## ✅ Git Ignore
 
-- [ ] Clean HTML from comment content (`utils/html_cleaner.py`)
-- [ ] Export report to CSV/Excel
-- [ ] Add CLI flags for selective fetch/download
-- [ ] Support HTML summary output
+This repo excludes:
+- `.DS_Store`
+- `.venv`
+- `__pycache__`
+- `results/` output directory
 
 ---
+
+## 📌 Notes
+
+- This repo is generalized and **does not reference any company or internal Basecamp account**
+- All code is designed to be reusable for any Basecamp 3 instance with OAuth access
+
+---
+
+## 📄 License
+
+MIT — Free to use and modify.
