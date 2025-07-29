@@ -2,6 +2,7 @@ import json
 import os
 import re
 import csv
+import requests
 from bs4 import BeautifulSoup
 from datetime import datetime
 from utils.basecamp_api import fetch_todo_detail, fetch_comments
@@ -73,6 +74,50 @@ def save_json(data, filepath):
         json.dump(data, f, indent=2, ensure_ascii=False)
 
 
+def download_attachments(todo_data, comments, attachments_root):
+    os.makedirs(attachments_root, exist_ok=True)
+
+    def extract_and_download(html, save_dir, prefix=""):
+        soup = BeautifulSoup(html or "", "html.parser")
+        for i, tag in enumerate(soup.find_all("bc-attachment")):
+            url = tag.get("href") or tag.get("url")
+            filename = tag.get("filename") or f"{prefix}_attachment_{i+1}"
+
+            if not url or not filename:
+                continue
+
+            try:
+                response = requests.get(url, headers=HEADERS, stream=True)
+                content_type = response.headers.get("Content-Type", "")
+
+                print(f"[INFO] Attempting to download: {filename} ({url}) — {content_type}")
+
+                if response.status_code == 200 and "html" not in content_type.lower():
+                    os.makedirs(save_dir, exist_ok=True)
+                    filepath = os.path.join(save_dir, filename)
+                    with open(filepath, "wb") as f:
+                        for chunk in response.iter_content(chunk_size=8192):
+                            if chunk:
+                                f.write(chunk)
+                    print(f"[OK] Saved to: {filepath}")
+                else:
+                    print(f"[WARN] Skipped (non-binary or failed): {filename} ({response.status_code})")
+
+            except Exception as e:
+                print(f"[ERROR] Exception downloading {url}: {e}")
+
+    # From description
+    desc_dir = os.path.join(attachments_root, "description")
+    extract_and_download(todo_data.get("description", ""), desc_dir, "desc")
+
+    # From comments
+    for c in comments:
+        comment_id = c.get("id")
+        content = c.get("content", "")
+        comment_dir = os.path.join(attachments_root, f"comment_{comment_id}")
+        extract_and_download(content, comment_dir, f"comment_{comment_id}")
+
+
 def main():
     todo_url = input("Enter full Basecamp To-do URL: ").strip()
 
@@ -98,12 +143,15 @@ def main():
 
     json_path = os.path.join(output_dir, f"todo_{todo_id}.json")
     csv_path = os.path.join(output_dir, f"todo_{todo_id}_jira.csv")
+    attachments_dir = os.path.join(output_dir, "attachments")
 
     save_json(result, json_path)
     export_to_csv(todo_data, comments_data, csv_path)
+    download_attachments(todo_data, comments_data, attachments_dir)
 
     print(f"[SUCCESS] Exported JSON: {json_path}")
     print(f"[SUCCESS] Exported CSV : {csv_path}")
+    print(f"[SUCCESS] Attachments saved in: {attachments_dir}")
 
 
 if __name__ == "__main__":
