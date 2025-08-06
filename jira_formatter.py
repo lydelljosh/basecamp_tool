@@ -21,8 +21,8 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
         writer.writeheader()
 
         for project, lists in todos_data.items():
-            for list_title, todos in lists.items():
-                for todo in todos:
+            for list_title, list_block in lists.items():
+                for todo in list_block.get("todos", []):
                     todo_id = todo.get("id")
                     url = todo.get("url", "")
                     try:
@@ -34,12 +34,10 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                     if not detail:
                         continue
 
-                    # Use description field, not content
                     raw_description = detail.get("description") or detail.get("description_html", "")
                     soup = BeautifulSoup(raw_description, "html.parser")
                     clean_description = soup.get_text(separator=" ", strip=True)
 
-                    # Format comments
                     comments = fetch_comments(account_id, bucket_id, todo_id, headers)
                     comment_blocks = []
                     for c in comments:
@@ -52,7 +50,6 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                             comment_blocks.append(f"{name} ({email}) at {created}:\n> {text}")
                     formatted_comments = "\n\n".join(comment_blocks)
 
-                    # Format attachments
                     attachments = detail.get("attachments", [])
                     attachment_lines = []
                     for a in attachments:
@@ -64,7 +61,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                     writer.writerow({
                         "Project": project,
                         "List": list_title,
-                        "Group": todo.get("group", ""),
+                        "Group": todo.get("group", "Ungrouped"),
                         "Todo Title": detail.get("title", ""),
                         "Description": clean_description,
                         "Assignees": ", ".join([p.get("name") for p in detail.get("assignees", [])]),
