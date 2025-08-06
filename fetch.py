@@ -33,19 +33,7 @@ def fetch_all_todos_from_dump(projects, output_dir):
 
         all_data[name] = {}
 
-        # CASE 1: Proper grouped response
-        if isinstance(sets_data, dict) and "groups" in sets_data:
-            print(f"[DEBUG] Grouped todolists found for: {name}")
-            for group in sets_data["groups"]:
-                group_name = group.get("name", "Ungrouped")
-                print(f"  > Group: {group_name}")
-                for tlist in group.get("todolists", []):
-                    list_title = f"{group_name} - {tlist.get('title')}"
-                    print(f"    - Fetching list: {list_title}")
-                    fetch_and_append_todos(account_id, bucket_id, tlist, list_title, all_data[name], headers)
-
-        # CASE 2: Flat response containing groups and todolists
-        elif isinstance(sets_data, list):
+        if isinstance(sets_data, list):
             print(f"[DEBUG] Flat list format for: {name}")
             current_group = None
             for item in sets_data:
@@ -68,8 +56,19 @@ def fetch_all_todos_from_dump(projects, output_dir):
 
 def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict, headers):
     list_id = tlist.get("id")
-    todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/todos.json"
 
+    # First get group ID-to-name mapping
+    group_map = {}
+    groups_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/groups.json"
+    try:
+        group_res = requests.get(groups_url, headers=headers)
+        if group_res.status_code == 200:
+            for group in group_res.json():
+                group_map[group["id"]] = group["name"]
+    except Exception as e:
+        print_error(f"Could not fetch groups for list {list_title}: {e}")
+
+    todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/todos.json"
     try:
         todos_res = requests.get(todos_url, headers=headers)
         todos_res.raise_for_status()
@@ -80,35 +79,32 @@ def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict
 
     enriched_todos = []
     for todo in todos:
-        todo_id = todo.get("id")
-        todo_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todos/{todo_id}.json"
-
         try:
-            detail_res = requests.get(todo_url, headers=headers)
-            detail_res.raise_for_status()
-            detail = detail_res.json()
-
+            group_name = group_map.get(todo.get("group_id")) or "Ungrouped"
             enriched_todos.append({
-                "id": detail.get("id"),
-                "title": detail.get("title"),
-                "assignees": [p.get("name") for p in detail.get("assignees", [])],
-                "due_on": detail.get("due_on"),
-                "created_at": detail.get("created_at"),
-                "completed": detail.get("completed"),
-                "completed_at": detail.get("completed_at"),
-                "created_by": detail.get("creator", {}).get("name"),
-                "notes": detail.get("content"),
-                "comments_count": detail.get("comments_count"),
-                "attachments_count": len(detail.get("attachments", [])),
+                "id": todo.get("id"),
+                "title": todo.get("title"),
+                "assignees": [p.get("name") for p in todo.get("assignees", [])],
+                "due_on": todo.get("due_on"),
+                "created_at": todo.get("created_at"),
+                "completed": todo.get("completed"),
+                "completed_at": todo.get("completed_at"),
+                "created_by": todo.get("creator", {}).get("name"),
+                "notes": todo.get("content"),
+                "comments_count": todo.get("comments_count"),
+                "attachments_count": len(todo.get("attachments", [])),
                 "attachments": [],
                 "comments": [],
-                "app_url": detail.get("app_url"),
-                "url": detail.get("url")
+                "app_url": todo.get("app_url"),
+                "url": todo.get("url"),
+                "group": group_name,
+                "parent_title": None
             })
-
         except Exception as e:
-            print_error(f"Failed to fetch full todo detail: {e}")
+            print_error(f"Failed to enrich todo: {e}")
             continue
 
     print(f"      ↳ Added {len(enriched_todos)} todos to: {list_title}")
-    output_dict[list_title] = enriched_todos
+    output_dict[list_title] = {
+        "todos": enriched_todos
+    }
