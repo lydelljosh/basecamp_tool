@@ -2,31 +2,36 @@
 
 This Python-based utility extracts To-dos, comments, and attachments from Basecamp 3 projects and exports the data into a structured CSV format (Jira-compatible). It supports retrieving:
 
-- All projects and their todo lists
+- All projects and their todo lists (including grouped lists)
 - Full todo details including:
-  - Description
-  - Assignees
-  - Completion status
-  - Comments (cleanly formatted with names and timestamps)
-  - Attachments (with direct links)
+  - Description with HTML content parsed to clean text
+  - Assignees and creators
+  - Completion status and due dates
+  - Comments (cleanly formatted with names, emails, and timestamps)
+  - Attachments (with direct download links)
+  - Group organization within todo lists
 
 ---
 
 ## 🔧 Features
 
-- ✅ Retrieves full To-do details per list
-- ✅ Fetches comments with readable formatting
-- ✅ Downloads and links attachments
-- ✅ Jira-ready CSV output
-- ✅ Custom configuration via `config.json`
-- 🧪 Handles most project formats
+- ✅ **Group-aware todo fetching** - Handles grouped todo lists with proper organization
+- ✅ **Robust error handling** - Automatic retries with exponential backoff for server errors (525, 502, 503, 504)
+- ✅ **Special character cleaning** - Converts Unicode characters to ASCII-compatible equivalents
+- ✅ **HTML content parsing** - Cleans HTML descriptions and comments to readable text
+- ✅ **Jira-ready CSV export** - Properly formatted for Jira import
+- ✅ **OAuth authentication flow** - Automated browser-based authentication setup
+- ✅ **Attachment support** - Downloads and links file attachments
+- ✅ **Comprehensive logging** - Detailed progress tracking and error reporting
 
 ---
 
-## 🚫 Known Limitations
+## 🆕 Recent Improvements
 
-- ❌ **Grouped To-do Lists (e.g. sections like "In Progress", "Bugs") are not accessible** with standard OAuth tokens.
-  - These require **elevated privileges (admin access)** to access the `recordings.json` or `todosets.json` endpoints where group data is exposed.
+- ✅ **Added group support** - Now properly fetches and organizes todos within grouped lists
+- ✅ **Enhanced error handling** - Automatic retry logic for temporary server failures
+- ✅ **Code consolidation** - Removed duplicate code and centralized utilities
+- ✅ **Improved reliability** - Better handling of API rate limits and server issues
 
 ---
 
@@ -35,94 +40,164 @@ This Python-based utility extracts To-dos, comments, and attachments from Baseca
 ```bash
 basecamp_tool/
 ├── main.py                  # Entry script to fetch and export data
+├── auth.py                  # OAuth authentication flow
 ├── dump.py                  # Dumps all project metadata
-├── fetch.py                 # Fetches todo and list data
-├── jira_formatter.py        # Formats data into a Jira-style CSV
-├── download_attachments.py  # Optional: Downloads attached files (WIP)
+├── fetch.py                 # Fetches todo and list data with group support
+├── jira_formatter.py        # Formats data into Jira-compatible CSV
+├── download_attachments.py  # Downloads file attachments
+├── link_exporter.py         # Link and message export utilities
 ├── utils/
-│   ├── basecamp_api.py      # API wrappers
-│   ├── utils.py             # Utility functions (save/load, logging)
-│   └── __init__.py
-├── config.json              # User tokens and flags
-├── .gitignore               # Git exclusions (includes .DS_Store, /results/)
+│   ├── basecamp_api.py      # API wrappers with retry logic
+│   ├── utils.py             # Utility functions (logging, text cleaning, constants)
+│   └── helpers.py           # URL parsing helpers
+├── config.json              # OAuth tokens and configuration
+├── .gitignore               # Git exclusions
 └── results/
-    └── run_*/               # Timestamped folders with outputs
+    └── run_YYYYMMDD_HHMMSS/ # Timestamped output folders
+        ├── projects_dump.json
+        ├── todos_deep.json
+        └── todos_jira.csv
 ```
 
 ---
 
 ## 📝 Setup
 
-1. Clone the repository
-2. Set up a virtual environment:
+### Prerequisites
+- Python 3.8+
+- Basecamp 3 account with API access
 
+### Installation
+
+1. Clone the repository:
 ```bash
-python3 -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+git clone <repository-url>
+cd basecamp_tool
 ```
 
-3. Fill in your `config.json` with the following:
+2. Install required dependencies:
+```bash
+pip install requests beautifulsoup4
+```
+
+3. Create your Basecamp 3 app:
+   - Go to https://launchpad.37signals.com/integrations
+   - Create a new app to get your `client_id` and `client_secret`
+
+4. Set up authentication - Create `config.json`:
 
 ```json
 {
   "client_id": "your-client-id",
-  "client_secret": "your-secret",
-  "redirect_uri": "http://localhost:8888/callback",
-  "access_token": "your-oauth-access-token",
-  "refresh_token": "",
-  "account_id": 12345678,
-  "project_filter": "",
-  "include_completed": false
+  "client_secret": "your-client-secret",
+  "redirect_uri": "http://localhost:8888/callback"
 }
 ```
+
+5. Get your OAuth tokens:
+```bash
+python -c "from auth import get_token; get_token()"
+```
+This will:
+- Open your browser for Basecamp authentication
+- Automatically save your access token and account ID to `config.json`
 
 ---
 
 ## 🚀 Usage
 
+### Basic Export
 ```bash
 python main.py
 ```
 
-- This runs the full dump → fetch → export flow
-- Output files will be saved in a new folder inside `results/` with timestamped naming
+This runs the complete workflow:
+1. **Dump projects** - Fetches all project metadata
+2. **Fetch todos** - Retrieves todos with group organization and details
+3. **Export to Jira CSV** - Creates a formatted CSV file for import
+
+### Output Location
+Files are saved in timestamped folders: `results/run_YYYYMMDD_HHMMSS/`
+
+### Authentication Setup
+If you need to re-authenticate or set up for the first time:
+```bash
+python auth.py
+```
 
 ---
 
-## 🗂 Output
+## 🗂 Output Files
 
-Each run generates:
+Each run generates timestamped files in `results/run_YYYYMMDD_HHMMSS/`:
 
-- `projects_dump.json`: Project metadata
-- `todos_deep.json`: Detailed todos + metadata
-- `todos_jira.csv`: Final CSV, ready for Jira import
+### `projects_dump.json`
+Raw project metadata from Basecamp API
+
+### `todos_deep.json`  
+Comprehensive todo data including:
+- Todo details (title, description, assignees, due dates)
+- Group organization and hierarchy
+- Attachment metadata
+- Creator and completion information
+
+### `todos_jira.csv`
+Jira-compatible CSV with columns:
+- Project, List, Group, Todo Title
+- Description (HTML cleaned to text)
+- Assignees, Created By, Due Date, Completed
+- Comments (formatted with author and timestamp)
+- Attachments (with download URLs)
+- App URL (link back to Basecamp)
 
 ---
 
-## ❗ Admin Access Requirement
+## 🔧 Error Handling
 
-To support **grouped to-do list** structures (e.g. lists with sections like "Backlog", "Completed", etc.), this script **requires an admin token** with elevated permissions. Without it, only top-level (ungrouped) todo lists are retrievable.
+The tool includes robust error handling:
+
+- **Automatic retries** - 3 attempts with exponential backoff for server errors (525, 502, 503, 504)
+- **Request timeouts** - 30-second timeout prevents hanging
+- **Detailed logging** - Progress tracking and error reporting
+- **Graceful degradation** - Continues processing other todos if individual requests fail
 
 ---
 
-## ✅ Git Ignore
+## 🚨 Troubleshooting
 
-This repo excludes:
-- `.DS_Store`
-- `.venv`
-- `__pycache__`
-- `results/` output directory
+### Common Issues
+
+**"525 Server Error"**: The tool now automatically retries these temporary Basecamp server errors.
+
+**"Missing Account-ID"**: Run the authentication setup again:
+```bash
+python -c "from auth import get_token; get_token()"
+```
+
+**Empty or missing todos**: Verify your Basecamp account has access to the projects and todo lists.
+
+**Import issues with special characters**: The tool automatically cleans Unicode characters to ASCII equivalents for better Jira compatibility.
+
+---
+
+## 🤝 Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes
+4. Test thoroughly
+5. Submit a pull request
 
 ---
 
 ## 📌 Notes
 
-- This repo is generalized and **does not reference any company or internal Basecamp account**
-- All code is designed to be reusable for any Basecamp 3 instance with OAuth access
+- This tool is generalized and does not reference any specific company or internal accounts
+- Designed to work with any Basecamp 3 instance with proper OAuth access
+- All sensitive data (tokens, account IDs) should be kept in `config.json` and never committed
 
 ---
 
 ## 📄 License
 
-MIT — Free to use and modify.
+MIT License - Free to use and modify.
