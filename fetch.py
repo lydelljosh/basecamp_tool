@@ -1,9 +1,7 @@
 import os
 import requests
 from auth import get_auth_headers
-from utils.utils import save_to_json, print_success, print_error
-
-BASE_URL = "https://3.basecampapi.com"
+from utils.utils import save_to_json, print_success, print_error, BASE_URL
 
 def fetch_all_todos_from_dump(projects, output_dir):
     headers = get_auth_headers()

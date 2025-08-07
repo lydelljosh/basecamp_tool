@@ -2,7 +2,7 @@ import os
 import csv
 from bs4 import BeautifulSoup
 from auth import get_auth_headers
-from utils.utils import print_success
+from utils.utils import print_success, clean_special_characters
 from utils.basecamp_api import fetch_todo_detail, fetch_comments
 
 def format_for_jira_live(todos_data: dict, run_dir: str):
@@ -68,17 +68,17 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                         group_name = parts[1]  # Group name from list title takes precedence
                     
                     writer.writerow({
-                        "Project": project,
-                        "List": list_name,
-                        "Group": group_name,
-                        "Todo Title": detail.get("title", ""),
-                        "Description": clean_description,
-                        "Assignees": ", ".join([p.get("name") for p in detail.get("assignees", [])]),
-                        "Created By": detail.get("creator", {}).get("name"),
+                        "Project": clean_special_characters(project),
+                        "List": clean_special_characters(list_name),
+                        "Group": clean_special_characters(group_name),
+                        "Todo Title": clean_special_characters(detail.get("title", "")),
+                        "Description": clean_special_characters(clean_description),
+                        "Assignees": clean_special_characters(", ".join([p.get("name") for p in detail.get("assignees", [])])),
+                        "Created By": clean_special_characters(detail.get("creator", {}).get("name") or ""),
                         "Due Date": detail.get("due_on") or "",
                         "Completed": detail.get("completed", False),
-                        "Comments": formatted_comments,
-                        "Attachments": " | ".join(attachment_lines),
+                        "Comments": clean_special_characters(formatted_comments),
+                        "Attachments": clean_special_characters(" | ".join(attachment_lines)),
                         "App URL": detail.get("app_url", "")
                     })
 
