@@ -58,10 +58,19 @@ def format_for_jira_live(todos_data: dict, run_dir: str):
                         if url:
                             attachment_lines.append(f"{name}: {url}")
 
+                    # Extract group from list_title if it follows the "List - Group" format
+                    # (Updated format from the new fetch logic)
+                    group_name = todo.get("group", "Ungrouped")
+                    list_name = list_title
+                    if " - " in list_title:
+                        parts = list_title.split(" - ", 1)
+                        list_name = parts[0]  # Original list name
+                        group_name = parts[1]  # Group name from list title takes precedence
+                    
                     writer.writerow({
                         "Project": project,
-                        "List": list_title,
-                        "Group": todo.get("group", "Ungrouped"),
+                        "List": list_name,
+                        "Group": group_name,
                         "Todo Title": detail.get("title", ""),
                         "Description": clean_description,
                         "Assignees": ", ".join([p.get("name") for p in detail.get("assignees", [])]),

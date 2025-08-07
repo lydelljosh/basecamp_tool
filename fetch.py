@@ -57,25 +57,61 @@ def fetch_all_todos_from_dump(projects, output_dir):
 def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict, headers):
     list_id = tlist.get("id")
 
-    # First get group ID-to-name mapping
+    # First get group ID-to-name mapping for individual todo group assignment
     group_map = {}
     groups_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/groups.json"
+    
     try:
-        group_res = requests.get(groups_url, headers=headers)
-        if group_res.status_code == 200:
-            for group in group_res.json():
-                group_map[group["id"]] = group["name"]
+        groups_res = requests.get(groups_url, headers=headers)
+        groups_res.raise_for_status()
+        groups = groups_res.json()
+        
+        # Build group mapping for individual todos
+        for group in groups:
+            group_map[group["id"]] = group["name"]
+        
+        # If groups exist and have todos_url, fetch todos from each group separately
+        if groups and any(group.get("todos_url") for group in groups):
+            print(f"      Found {len(groups)} groups in {list_title}")
+            for group in groups:
+                group_name = group.get("name", "Unnamed Group")
+                
+                # Use the todos_url provided by the group response
+                group_todos_url = group.get("todos_url")
+                if not group_todos_url:
+                    print(f"        ↳ No todos_url found for group: {group_name}")
+                    continue
+                
+                group_enriched_todos = fetch_todos_from_url(group_todos_url, account_id, bucket_id, headers, f"{list_title} - {group_name}", group_map)
+                
+                # Store with group information
+                group_key = f"{list_title} - {group_name}"
+                output_dict[group_key] = {"todos": group_enriched_todos}
+                print(f"        ↳ Added {len(group_enriched_todos)} todos to group: {group_name}")
+            return
+            
     except Exception as e:
-        print_error(f"Could not fetch groups for list {list_title}: {e}")
-
+        # If groups endpoint fails, fall back to fetching all todos from the list
+        print(f"      No groups found in {list_title}, fetching all todos")
+    
+    # Fallback: fetch all todos from the list directly (no groups)
     todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/todos.json"
+    enriched_todos = fetch_todos_from_url(todos_url, account_id, bucket_id, headers, list_title, group_map)
+    
+    print(f"      ↳ Added {len(enriched_todos)} todos to: {list_title}")
+    output_dict[list_title] = {"todos": enriched_todos}
+
+def fetch_todos_from_url(todos_url, account_id, bucket_id, headers, context_name, group_map=None):
+    """Helper function to fetch and enrich todos from a given URL"""
+    if group_map is None:
+        group_map = {}
     try:
         todos_res = requests.get(todos_url, headers=headers)
         todos_res.raise_for_status()
         todos = todos_res.json()
     except Exception as e:
-        print_error(f"Failed to fetch todos for list {list_title}: {e}")
-        return
+        print_error(f"Failed to fetch todos for {context_name}: {e}")
+        return []
 
     enriched_todos = []
     for todo in todos:
@@ -104,7 +140,4 @@ def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict
             print_error(f"Failed to enrich todo: {e}")
             continue
 
-    print(f"      ↳ Added {len(enriched_todos)} todos to: {list_title}")
-    output_dict[list_title] = {
-        "todos": enriched_todos
-    }
+    return enriched_todos
