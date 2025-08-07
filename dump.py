@@ -4,9 +4,7 @@ import json
 import requests
 from datetime import datetime
 from auth import get_auth_headers
-from utils.utils import save_config, load_config, print_success, print_error
-
-BASE_URL = "https://3.basecampapi.com"
+from utils.utils import print_success, print_error, BASE_URL
 
 def dump_projects(output_root: str = "results") -> tuple[str, str, list]:
     """

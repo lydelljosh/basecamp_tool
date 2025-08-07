@@ -1,18 +1,37 @@
 import requests
 import re
-from utils.utils import print_error
-
-BASE_URL = "https://3.basecampapi.com"
+import time
+from utils.utils import print_error, BASE_URL
 
 def fetch_todo_detail(account_id: str, bucket_id: str, todo_id: int, headers: dict) -> dict | None:
-    try:
-        url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todos/{todo_id}.json"
-        res = requests.get(url, headers=headers)
-        res.raise_for_status()
-        return res.json()
-    except Exception as e:
-        print_error(f"[TODO FETCH FAIL] {todo_id}: {e}")
-        return None
+    url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todos/{todo_id}.json"
+    max_retries = 3
+    
+    for attempt in range(max_retries):
+        try:
+            res = requests.get(url, headers=headers, timeout=30)
+            res.raise_for_status()
+            return res.json()
+        except requests.exceptions.HTTPError as e:
+            if e.response.status_code in [525, 502, 503, 504] and attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"[RETRY] {todo_id}: Server error {e.response.status_code}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+            else:
+                print_error(f"[TODO FETCH FAIL] {todo_id}: {e}")
+                return None
+        except Exception as e:
+            if attempt < max_retries - 1:
+                wait_time = 2 ** attempt
+                print(f"[RETRY] {todo_id}: {e}, retrying in {wait_time}s (attempt {attempt + 1}/{max_retries})")
+                time.sleep(wait_time)
+                continue
+            else:
+                print_error(f"[TODO FETCH FAIL] {todo_id}: {e}")
+                return None
+    
+    return None
 
 def fetch_comments(account_id: str, bucket_id: str, item_id: int, headers: dict) -> list[dict]:
     all_comments = []
