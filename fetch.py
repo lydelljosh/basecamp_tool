@@ -1,12 +1,19 @@
 import os
 import requests
 from auth import get_auth_headers
-from utils.utils import save_to_json, print_success, print_error, BASE_URL
+from utils.utils import save_to_json, print_success, print_error, BASE_URL, load_config
 
 def fetch_all_todos_from_dump(projects, output_dir):
     headers = get_auth_headers()
     account_id = headers.get("Account-ID")
+    config = load_config()
+    include_completed = config.get("include_completed", False)
     all_data = {}
+    
+    if include_completed:
+        print("[INFO] Including completed todos and todolists")
+    else:
+        print("[INFO] Excluding completed todos and todolists")
 
     for project in projects:
         bucket_id = project.get("id")
@@ -19,12 +26,30 @@ def fetch_all_todos_from_dump(projects, output_dir):
             print_error(f"No todoset found for {name}")
             continue
 
+        # Fetch active todolists
         todosets_url = todoset_link.get("url").replace(".json", "/todolists.json")
 
         try:
+            # Fetch active todolists
             sets_res = requests.get(todosets_url, headers=headers)
             sets_res.raise_for_status()
             sets_data = sets_res.json()
+            
+            # Fetch archived todolists only if enabled in config
+            if include_completed:
+                archived_todosets_url = todosets_url + "?status=archived"
+                try:
+                    archived_res = requests.get(archived_todosets_url, headers=headers)
+                    archived_res.raise_for_status()
+                    archived_data = archived_res.json()
+                    
+                    # Merge archived todolists with active ones
+                    if isinstance(sets_data, list) and isinstance(archived_data, list):
+                        sets_data.extend(archived_data)
+                        print(f"[DEBUG] Found {len(archived_data)} archived todo lists for {name}")
+                except Exception as archived_e:
+                    print(f"[INFO] No archived todolists found for {name}: {archived_e}")
+                
         except Exception as e:
             print_error(f"Failed to fetch todolists for {name}: {e}")
             continue
@@ -43,7 +68,7 @@ def fetch_all_todos_from_dump(projects, output_dir):
                     if current_group:
                         list_title = f"{current_group} - {list_title}"
                     print(f"    - Fetching list: {list_title}")
-                    fetch_and_append_todos(account_id, bucket_id, item, list_title, all_data[name], headers)
+                    fetch_and_append_todos(account_id, bucket_id, item, list_title, all_data[name], headers, include_completed)
         else:
             print_error(f"Unrecognized todolist format for {name}")
 
@@ -52,7 +77,7 @@ def fetch_all_todos_from_dump(projects, output_dir):
     print_success(f"Saved deep todos to {output_path}")
     return output_path, all_data
 
-def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict, headers):
+def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict, headers, include_completed=False):
     list_id = tlist.get("id")
 
     # First get group ID-to-name mapping for individual todo group assignment
@@ -80,12 +105,25 @@ def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict
                     print(f"        ↳ No todos_url found for group: {group_name}")
                     continue
                 
-                group_enriched_todos = fetch_todos_from_url(group_todos_url, account_id, bucket_id, headers, f"{list_title} - {group_name}", group_map)
+                # Fetch active todos from group
+                group_active_todos = fetch_todos_from_url(group_todos_url, account_id, bucket_id, headers, f"{list_title} - {group_name}", group_map)
+                
+                # Fetch completed todos from group only if enabled
+                group_completed_todos = []
+                if include_completed:
+                    group_completed_url = group_todos_url + "?completed=true"
+                    group_completed_todos = fetch_todos_from_url(group_completed_url, account_id, bucket_id, headers, f"{list_title} - {group_name} (completed)", group_map)
+                
+                # Combine active and completed todos for this group
+                all_group_todos = group_active_todos + group_completed_todos
                 
                 # Store with group information
                 group_key = f"{list_title} - {group_name}"
-                output_dict[group_key] = {"todos": group_enriched_todos}
-                print(f"        ↳ Added {len(group_enriched_todos)} todos to group: {group_name}")
+                output_dict[group_key] = {"todos": all_group_todos}
+                if include_completed:
+                    print(f"        ↳ Added {len(group_active_todos)} active + {len(group_completed_todos)} completed = {len(all_group_todos)} total todos to group: {group_name}")
+                else:
+                    print(f"        ↳ Added {len(group_active_todos)} active todos to group: {group_name}")
             return
             
     except Exception as e:
@@ -93,11 +131,23 @@ def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict
         print(f"      No groups found in {list_title}, fetching all todos")
     
     # Fallback: fetch all todos from the list directly (no groups)
-    todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/todos.json"
-    enriched_todos = fetch_todos_from_url(todos_url, account_id, bucket_id, headers, list_title, group_map)
+    active_todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/todos.json"
+    active_todos = fetch_todos_from_url(active_todos_url, account_id, bucket_id, headers, list_title, group_map)
     
-    print(f"      ↳ Added {len(enriched_todos)} todos to: {list_title}")
-    output_dict[list_title] = {"todos": enriched_todos}
+    # Fetch completed todos only if enabled
+    completed_todos = []
+    if include_completed:
+        completed_todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/todos.json?completed=true"
+        completed_todos = fetch_todos_from_url(completed_todos_url, account_id, bucket_id, headers, f"{list_title} (completed)", group_map)
+    
+    # Combine active and completed todos
+    all_todos = active_todos + completed_todos
+    
+    if include_completed:
+        print(f"      ↳ Added {len(active_todos)} active + {len(completed_todos)} completed = {len(all_todos)} total todos to: {list_title}")
+    else:
+        print(f"      ↳ Added {len(active_todos)} active todos to: {list_title}")
+    output_dict[list_title] = {"todos": all_todos}
 
 def fetch_todos_from_url(todos_url, account_id, bucket_id, headers, context_name, group_map=None):
     """Helper function to fetch and enrich todos from a given URL"""
@@ -107,6 +157,14 @@ def fetch_todos_from_url(todos_url, account_id, bucket_id, headers, context_name
         todos_res = requests.get(todos_url, headers=headers)
         todos_res.raise_for_status()
         todos = todos_res.json()
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 404 and "completed" in todos_url:
+            # Completed todos endpoint doesn't exist, which is normal
+            print(f"        [INFO] No completed todos found for {context_name}")
+            return []
+        else:
+            print_error(f"Failed to fetch todos for {context_name}: {e}")
+            return []
     except Exception as e:
         print_error(f"Failed to fetch todos for {context_name}: {e}")
         return []

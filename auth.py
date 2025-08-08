@@ -25,6 +25,25 @@ def exchange_code_for_token(code, client_id, client_secret, redirect_uri):
     return None
 
 
+def refresh_access_token(refresh_token, client_id, client_secret):
+    """Refresh access token using refresh token"""
+    token_url = "https://launchpad.37signals.com/authorization/token"
+    payload = {
+        "type": "refresh",
+        "client_id": client_id,
+        "client_secret": client_secret,
+        "refresh_token": refresh_token
+    }
+    try:
+        res = requests.post(token_url, data=payload)
+        if res.status_code == 200:
+            return res.json()
+        else:
+            print_error(f"[Token Refresh] Failed: {res.status_code} {res.text}")
+    except Exception as e:
+        print_error(f"[Token Refresh] Exception: {e}")
+    return None
+
 def get_account_id(access_token):
     try:
         headers = {"Authorization": f"Bearer {access_token}"}
