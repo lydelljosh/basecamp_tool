@@ -18,6 +18,11 @@ def dump_projects(output_root: str = "results") -> tuple[str, str, list]:
 
     projects_url = f"{BASE_URL}/{account_id}/projects.json"
 
+    # Always create run directory first, even if projects fetch fails
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    run_dir = os.path.join(output_root, f"run_{ts}")
+    os.makedirs(run_dir, exist_ok=True)
+
     try:
         resp = requests.get(projects_url, headers=headers)
         resp.raise_for_status()
@@ -26,11 +31,7 @@ def dump_projects(output_root: str = "results") -> tuple[str, str, list]:
             raise RuntimeError("Unexpected response for projects.json (not a list).")
     except Exception as e:
         print_error(f"Failed to fetch projects: {e}")
-        return "", "", []
-
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    run_dir = os.path.join(output_root, f"run_{ts}")
-    os.makedirs(run_dir, exist_ok=True)
+        return run_dir, "", []
 
     projects_path = os.path.join(run_dir, "projects_dump.json")
     with open(projects_path, "w", encoding="utf-8") as f:

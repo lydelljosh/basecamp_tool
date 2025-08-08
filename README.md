@@ -16,6 +16,8 @@ This Python-based utility extracts To-dos, comments, and attachments from Baseca
 ## 🔧 Features
 
 - ✅ **Group-aware todo fetching** - Handles grouped todo lists with proper organization
+- ✅ **Completed todo/todolist support** - Optional fetching of archived/completed todolists and todos
+- ✅ **Token refresh handling** - Automatic access token refresh using refresh tokens
 - ✅ **Robust error handling** - Automatic retries with exponential backoff for server errors (525, 502, 503, 504)
 - ✅ **Special character cleaning** - Converts Unicode characters to ASCII-compatible equivalents
 - ✅ **HTML content parsing** - Cleans HTML descriptions and comments to readable text
@@ -28,10 +30,12 @@ This Python-based utility extracts To-dos, comments, and attachments from Baseca
 
 ## 🆕 Recent Improvements
 
+- ✅ **Completed todos support** - Added configurable option to include archived/completed todolists and todos
+- ✅ **Token refresh mechanism** - Automatic refresh of expired access tokens using refresh tokens
+- ✅ **Enhanced error handling** - Better handling of 404 errors for completed todos endpoints
+- ✅ **Improved run directory creation** - Creates output directory even when projects fetch fails
 - ✅ **Added group support** - Now properly fetches and organizes todos within grouped lists
-- ✅ **Enhanced error handling** - Automatic retry logic for temporary server failures
 - ✅ **Code consolidation** - Removed duplicate code and centralized utilities
-- ✅ **Improved reliability** - Better handling of API rate limits and server issues
 
 ---
 
@@ -90,9 +94,13 @@ pip install requests beautifulsoup4
 {
   "client_id": "your-client-id",
   "client_secret": "your-client-secret",
-  "redirect_uri": "http://localhost:8888/callback"
+  "redirect_uri": "http://localhost:8888/callback",
+  "include_completed": false
 }
 ```
+
+**Configuration Options:**
+- `include_completed`: Set to `true` to fetch archived/completed todolists and todos (default: `false`)
 
 5. Get your OAuth tokens:
 ```bash
@@ -113,7 +121,7 @@ python main.py
 
 This runs the complete workflow:
 1. **Dump projects** - Fetches all project metadata
-2. **Fetch todos** - Retrieves todos with group organization and details
+2. **Fetch todos** - Retrieves todos with group organization and details (includes completed items if configured)
 3. **Export to Jira CSV** - Creates a formatted CSV file for import
 
 ### Output Location
@@ -140,6 +148,7 @@ Comprehensive todo data including:
 - Group organization and hierarchy
 - Attachment metadata
 - Creator and completion information
+- Archived/completed todolists and todos (if configured)
 
 ### `todos_jira.csv`
 Jira-compatible CSV with columns:
