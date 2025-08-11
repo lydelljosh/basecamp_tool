@@ -40,7 +40,7 @@ class BasecampSessionAuth:
             soup = BeautifulSoup(response.text, 'html.parser')
             
             # Debug: save login page to see structure
-            with open("debug_login_page.html", "w") as f:
+            with open("debug_login_page.html", "w", encoding='utf-8') as f:
                 f.write(response.text)
             print(f"Login page saved to debug_login_page.html for inspection")
             
