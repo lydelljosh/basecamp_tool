@@ -9,8 +9,8 @@ def main():
     # Step 2 - Fetch todos metadata (with URLs and IDs)
     todos_path, todos = fetch_all_todos_from_dump(projects, run_dir)
 
-    # Step 3 - Export live to Jira CSV (fetches comments inline)
-    format_for_jira_live(todos, run_dir)
+    # Step 3 - Export live to Jira CSV (fetches comments inline) + Download attachments
+    format_for_jira_live(todos, run_dir, download_attachments=True)
 
 if __name__ == "__main__":
     main()
