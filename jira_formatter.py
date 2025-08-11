@@ -12,6 +12,9 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
     if not account_id:
         raise ValueError("Missing Account-ID in headers.")
 
+    print_success(f"DEBUG: format_for_jira_live called with download_attachments={download_attachments}")
+    print_success(f"DEBUG: todos_data has {len(todos_data)} projects")
+
     # Initialize session authentication for attachment downloads
     session_auth = None
     if download_attachments:
@@ -22,6 +25,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
             session_auth = None
         else:
             print_success("Session authentication successful!")
+            print_success(f"DEBUG: session_auth object created successfully")
 
     # Create attachments directory
     attachments_dir = os.path.join(run_dir, "attachments")
@@ -37,14 +41,20 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
         ])
         writer.writeheader()
 
+        todo_count = 0
         for project, lists in todos_data.items():
             for list_title, list_block in lists.items():
-                for todo in list_block.get("todos", []):
+                todos_in_list = list_block.get("todos", [])
+                print_success(f"DEBUG: Processing list '{list_title}' with {len(todos_in_list)} todos")
+                for todo in todos_in_list:
+                    todo_count += 1
                     todo_id = todo.get("id")
                     url = todo.get("url", "")
+                    print_success(f"DEBUG: Processing todo #{todo_count}: ID={todo_id}")
                     try:
                         bucket_id = url.split("/buckets/")[1].split("/")[0]
                     except Exception:
+                        print_error(f"DEBUG: Could not extract bucket_id from URL: {url}")
                         continue
 
                     detail = fetch_todo_detail(account_id, bucket_id, todo_id, headers)
