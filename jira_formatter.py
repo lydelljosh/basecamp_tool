@@ -61,13 +61,16 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                     
                     if session_auth and download_attachments:
                         os.makedirs(todo_attachments_dir, exist_ok=True)
+                        print_success(f"Processing todo {todo_id} for attachments...")
                         
                         # Download attachments from description
                         if raw_description:
                             soup = BeautifulSoup(raw_description, "html.parser")
+                            print_success(f"Description length: {len(raw_description)} chars")
                             
                             # Download bc-attachment elements
                             bc_attachments = soup.find_all("bc-attachment")
+                            print_success(f"Found {len(bc_attachments)} bc-attachment elements in description")
                             for i, bc_att in enumerate(bc_attachments):
                                 filename = bc_att.get("filename", f"attachment_{i}")
                                 download_url = bc_att.get("href")
@@ -83,6 +86,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                             
                             # Download images from description
                             images = soup.find_all("img")
+                            print_success(f"Found {len(images)} images in description")
                             for i, img in enumerate(images):
                                 src = img.get("src")
                                 if src and not any(skip in src.lower() for skip in ['avatar', 'profile', 'people']):
@@ -101,6 +105,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                                         })
 
                     comments = fetch_comments(account_id, bucket_id, todo_id, headers)
+                    print_success(f"Found {len(comments)} comments")
                     comment_blocks = []
                     for c_idx, c in enumerate(comments):
                         name = c.get("creator", {}).get("name", "Unknown")
@@ -153,6 +158,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
 
                     # Process main todo attachments
                     attachments = detail.get("attachments", [])
+                    print_success(f"Found {len(attachments)} main attachments")
                     attachment_lines = []
                     for attachment in attachments:
                         name = attachment.get("filename") or attachment.get("name") or "unnamed"
