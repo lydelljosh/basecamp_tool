@@ -29,6 +29,13 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
     if download_attachments:
         os.makedirs(attachments_dir, exist_ok=True)
 
+    # Count total todos to process
+    total_todos = sum(len(list_block.get("todos", [])) for lists in todos_data.values() for list_block in lists.values())
+    print_success(f"Processing {total_todos} todos for attachment downloads...")
+    
+    processed_todos = 0
+    attachment_candidates = 0
+
     output_path = os.path.join(run_dir, "todos_jira.csv")
     with open(output_path, mode="w", newline="", encoding="utf-8") as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=[
@@ -41,6 +48,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
         for project, lists in todos_data.items():
             for list_title, list_block in lists.items():
                 for todo in list_block.get("todos", []):
+                    processed_todos += 1
                     todo_id = todo.get("id")
                     url = todo.get("url", "")
                     try:
@@ -62,13 +70,22 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                     
                     if session_auth and download_attachments:
                         os.makedirs(todo_attachments_dir, exist_ok=True)
+                        print(f"DEBUG: Processing todo {todo_id} for attachments...")
+                        
+                        # Check if this todo has any potential attachments
+                        has_attachments = bool(raw_description) or len(detail.get("attachments", [])) > 0
+                        if has_attachments:
+                            attachment_candidates += 1
+                            print(f"DEBUG: Todo {todo_id} has attachments - description: {bool(raw_description)}, main attachments: {len(detail.get('attachments', []))}")
                         
                         # Download attachments from description
                         if raw_description:
                             soup = BeautifulSoup(raw_description, "html.parser")
+                            print(f"DEBUG: Description length: {len(raw_description)} chars")
                             
                             # Download bc-attachment elements
                             bc_attachments = soup.find_all("bc-attachment")
+                            print(f"DEBUG: Found {len(bc_attachments)} bc-attachment elements in description")
                             for i, bc_att in enumerate(bc_attachments):
                                 filename = bc_att.get("filename", f"attachment_{i}")
                                 download_url = bc_att.get("href")
@@ -84,6 +101,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                             
                             # Download images from description
                             images = soup.find_all("img")
+                            print(f"DEBUG: Found {len(images)} images in description")
                             for i, img in enumerate(images):
                                 src = img.get("src")
                                 if src and not any(skip in src.lower() for skip in ['avatar', 'profile', 'people']):
@@ -154,6 +172,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
 
                     # Process main todo attachments
                     attachments = detail.get("attachments", [])
+                    print(f"DEBUG: Todo {todo_id} has {len(attachments)} main attachments")
                     attachment_lines = []
                     for attachment in attachments:
                         name = attachment.get("filename") or attachment.get("name") or "unnamed"
@@ -203,6 +222,9 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                     })
 
     print_success(f"Exported Jira CSV to {output_path}")
+    
+    # Print processing summary
+    print_success(f"Processed {processed_todos} todos, {attachment_candidates} had potential attachments")
     
     # Print attachment download summary
     if download_attachments and session_auth:

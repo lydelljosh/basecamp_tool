@@ -161,11 +161,16 @@ class BasecampSessionAuth:
             
         try:
             print(f"Downloading: {url}")
+            print(f"Saving to: {local_path}")
+            
             response = self.session.get(url, stream=True)
             response.raise_for_status()
             
-            # Create directory if needed
-            os.makedirs(os.path.dirname(local_path), exist_ok=True)
+            # Create directory if needed - handle Windows path issues
+            dir_path = os.path.dirname(local_path)
+            if dir_path:  # Only create directory if there is a directory component
+                print(f"Creating directory: {dir_path}")
+                os.makedirs(dir_path, exist_ok=True)
             
             with open(local_path, 'wb') as f:
                 for chunk in response.iter_content(chunk_size=8192):
@@ -175,7 +180,8 @@ class BasecampSessionAuth:
             return True
             
         except Exception as e:
-            print_error(f"Download failed: {str(e)}")
+            print_error(f"Download failed for {url}: {str(e)}")
+            print_error(f"Local path was: {local_path}")
             return False
 
 def test_session_login():
