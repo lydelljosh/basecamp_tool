@@ -189,18 +189,18 @@ def test_session_login():
     auth = BasecampSessionAuth()
     
     if auth.login():
-        print_success("✅ Session login successful!")
+        print_success("Session login successful!")
         
         # Test downloading a file (using the attachment URL from our previous test)
         test_url = "https://storage.3.basecamp.com/4146522/blobs/c01303aa-dc88-11ef-a1ff-44a842377e52/download/image.png"
         test_path = "test_downloads/session_test_image.png"
         
         if auth.download_file(test_url, test_path):
-            print_success("✅ File download successful!")
+            print_success("File download successful!")
         else:
-            print_error("❌ File download failed")
+            print_error("File download failed")
     else:
-        print_error("❌ Session login failed")
+        print_error("Session login failed")
 
 if __name__ == "__main__":
     test_session_login()

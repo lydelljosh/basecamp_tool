@@ -44,7 +44,7 @@ def main():
         config["refresh_token"] = new_refresh_token
     
     save_config(config)
-    print_success("✅ Access token refreshed successfully!")
+    print_success("Access token refreshed successfully!")
     print("You can now run main.py again.")
 
 if __name__ == "__main__":
