@@ -5,3 +5,4 @@ results/
 .env/
 .venv/
 .DS_Store
+debug_login_page.html
