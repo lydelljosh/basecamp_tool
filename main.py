@@ -38,7 +38,7 @@ def ensure_valid_token():
         config["refresh_token"] = new_refresh_token
     
     save_config(config)
-    print_success("✅ Access token refreshed and saved to config.json")
+    print_success("Access token refreshed and saved to config.json")
     return True
 
 def main():

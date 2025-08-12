@@ -7,7 +7,7 @@ def fetch_all_todos_from_dump(projects, output_dir):
     headers = get_auth_headers()
     account_id = headers.get("Account-ID")
     config = load_config()
-    include_completed = config.get("include_completed", False)
+    include_completed = config.get("include_completed", True)  # Default to True - include completed todos by default
     all_data = {}
     
     if include_completed:
@@ -111,7 +111,8 @@ def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict
                 # Fetch completed todos from group only if enabled
                 group_completed_todos = []
                 if include_completed:
-                    group_completed_url = group_todos_url + "?completed=true"
+                    # Use the correct Basecamp API endpoint for completed todos
+                    group_completed_url = group_todos_url.replace("/todos.json", "/completed_todos.json")
                     group_completed_todos = fetch_todos_from_url(group_completed_url, account_id, bucket_id, headers, f"{list_title} - {group_name} (completed)", group_map)
                 
                 # Combine active and completed todos for this group
@@ -137,7 +138,8 @@ def fetch_and_append_todos(account_id, bucket_id, tlist, list_title, output_dict
     # Fetch completed todos only if enabled
     completed_todos = []
     if include_completed:
-        completed_todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/todos.json?completed=true"
+        # Use the correct Basecamp API endpoint for completed todos
+        completed_todos_url = f"{BASE_URL}/{account_id}/buckets/{bucket_id}/todolists/{list_id}/completed_todos.json"
         completed_todos = fetch_todos_from_url(completed_todos_url, account_id, bucket_id, headers, f"{list_title} (completed)", group_map)
     
     # Combine active and completed todos
@@ -158,8 +160,8 @@ def fetch_todos_from_url(todos_url, account_id, bucket_id, headers, context_name
         todos_res.raise_for_status()
         todos = todos_res.json()
     except requests.exceptions.HTTPError as e:
-        if e.response.status_code == 404 and "completed" in todos_url:
-            # Completed todos endpoint doesn't exist, which is normal
+        if e.response.status_code == 404 and "completed_todos.json" in todos_url:
+            # Completed todos endpoint doesn't exist, which is normal for lists with no completed todos
             print(f"        [INFO] No completed todos found for {context_name}")
             return []
         else:

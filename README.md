@@ -111,14 +111,14 @@ pip install requests beautifulsoup4
   "client_id": "your-client-id",
   "client_secret": "your-client-secret",
   "redirect_uri": "http://localhost:8888/callback",
-  "include_completed": false,
+  "include_completed": true,
   "username": "your-basecamp-email@example.com",
   "password": "your-basecamp-password"
 }
 ```
 
 **Configuration Options:**
-- `include_completed`: Set to `true` to fetch archived/completed todolists and todos (default: `false`)
+- `include_completed`: Set to `false` to exclude archived/completed todolists and todos (default: `true`)
 - `username` & `password`: Required for session-based attachment downloads (used only for file authentication, not stored elsewhere)
 
 5. Get your OAuth tokens:
