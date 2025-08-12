@@ -7,7 +7,7 @@ def fetch_all_todos_from_dump(projects, output_dir):
     headers = get_auth_headers()
     account_id = headers.get("Account-ID")
     config = load_config()
-    include_completed = config.get("include_completed", False)
+    include_completed = config.get("include_completed", True)  # Default to True - include completed todos by default
     all_data = {}
     
     if include_completed:
