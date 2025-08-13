@@ -2,7 +2,7 @@ import os
 import csv
 from bs4 import BeautifulSoup
 from auth import get_auth_headers
-from utils.utils import print_success, clean_special_characters, print_error
+from utils.utils import print_success, clean_special_characters, print_error, sanitize_csv_field
 from utils.basecamp_api import fetch_todo_detail, fetch_comments
 from session_auth import BasecampSessionAuth
 
@@ -128,7 +128,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                         raw_text = c.get("content") or c.get("content_html", "")
                         text = BeautifulSoup(raw_text, "html.parser").get_text(separator=" ", strip=True)
                         if text:
-                            comment_blocks.append(f"{name} ({email}) at {created}:\n> {text}")
+                            comment_blocks.append(f"{name} ({email}) at {created}: > {text}")
                             
                         # Download attachments from comments
                         if session_auth and download_attachments and raw_text:
@@ -206,18 +206,18 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                         downloaded_info.append(f"{file_info['filename']} -> {file_info['local_path']} (from {file_info['source']})")
                     
                     writer.writerow({
-                        "Project": clean_special_characters(project),
-                        "List": clean_special_characters(list_name),
-                        "Group": clean_special_characters(group_name),
-                        "Todo Title": clean_special_characters(detail.get("title", "")),
-                        "Description": clean_special_characters(clean_description),
-                        "Assignees": clean_special_characters(", ".join([p.get("name") for p in detail.get("assignees", [])])),
-                        "Created By": clean_special_characters(detail.get("creator", {}).get("name") or ""),
+                        "Project": sanitize_csv_field(clean_special_characters(project)),
+                        "List": sanitize_csv_field(clean_special_characters(list_name)),
+                        "Group": sanitize_csv_field(clean_special_characters(group_name)),
+                        "Todo Title": sanitize_csv_field(clean_special_characters(detail.get("title", ""))),
+                        "Description": sanitize_csv_field(clean_special_characters(clean_description)),
+                        "Assignees": sanitize_csv_field(clean_special_characters(", ".join([p.get("name") for p in detail.get("assignees", [])]))),
+                        "Created By": sanitize_csv_field(clean_special_characters(detail.get("creator", {}).get("name") or "")),
                         "Due Date": detail.get("due_on") or "",
                         "Completed": detail.get("completed", False),
-                        "Comments": clean_special_characters(formatted_comments),
-                        "Attachments": clean_special_characters(" | ".join(attachment_lines)),
-                        "Downloaded Files": clean_special_characters(" | ".join(downloaded_info)),
+                        "Comments": sanitize_csv_field(clean_special_characters(formatted_comments)),
+                        "Attachments": sanitize_csv_field(clean_special_characters(" | ".join(attachment_lines))),
+                        "Downloaded Files": sanitize_csv_field(clean_special_characters(" | ".join(downloaded_info))),
                         "App URL": detail.get("app_url", "")
                     })
 

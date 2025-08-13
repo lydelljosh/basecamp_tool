@@ -68,6 +68,23 @@ def clean_special_characters(text):
     
     return cleaned
 
+def sanitize_csv_field(text):
+    """Clean text for CSV compatibility across platforms (Windows/macOS)"""
+    if not text:
+        return text
+    
+    # Replace any newlines (both \n and \r\n) with spaces for CSV compatibility
+    # This prevents Windows CSV readers from breaking rows on internal newlines
+    cleaned = re.sub(r'\r?\n', ' ', text)
+    
+    # Clean up multiple consecutive spaces
+    cleaned = re.sub(r' {2,}', ' ', cleaned)
+    
+    # Trim leading/trailing spaces
+    cleaned = cleaned.strip()
+    
+    return cleaned
+
 def save_to_json(data, filename="output.json"):
     try:
         with open(filename, "w", encoding="utf-8") as f:
