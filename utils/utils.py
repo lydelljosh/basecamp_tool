@@ -73,15 +73,23 @@ def sanitize_csv_field(text):
     if not text:
         return text
     
+    # Remove base64 encoded data (common in embedded images)
+    # Pattern matches base64 strings that are typically very long
+    cleaned = re.sub(r'[A-Za-z0-9+/]{100,}={0,2}', '[base64 data removed]', text)
+    
     # Replace any newlines (both \n and \r\n) with spaces for CSV compatibility
     # This prevents Windows CSV readers from breaking rows on internal newlines
-    cleaned = re.sub(r'\r?\n', ' ', text)
+    cleaned = re.sub(r'\r?\n', ' ', cleaned)
     
     # Clean up multiple consecutive spaces
     cleaned = re.sub(r' {2,}', ' ', cleaned)
     
     # Trim leading/trailing spaces
     cleaned = cleaned.strip()
+    
+    # Limit field length to prevent extremely long text from breaking CSV readers
+    if len(cleaned) > 5000:
+        cleaned = cleaned[:4997] + "..."
     
     return cleaned
 
