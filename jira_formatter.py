@@ -50,10 +50,17 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                 for todo in list_block.get("todos", []):
                     processed_todos += 1
                     todo_id = todo.get("id")
+                    
+                    # Validate todo_id before processing
+                    if not todo_id:
+                        print_error(f"Missing todo_id for todo in project '{project}', list '{list_title}', skipping")
+                        continue
+                    
                     url = todo.get("url", "")
                     try:
                         bucket_id = url.split("/buckets/")[1].split("/")[0]
                     except Exception:
+                        print_error(f"Could not extract bucket_id from URL for todo {todo_id}, skipping")
                         continue
 
                     detail = fetch_todo_detail(account_id, bucket_id, todo_id, headers)

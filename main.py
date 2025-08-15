@@ -2,7 +2,7 @@ from dump import dump_projects
 from fetch import fetch_all_todos_from_dump
 from jira_formatter import format_for_jira_live
 from auth import refresh_access_token
-from utils.utils import load_config, save_config, print_success, print_error
+from utils.utils import load_config, save_config, print_success, print_error, validate_config
 
 def ensure_valid_token():
     """Ensure we have a valid access token by refreshing it."""
@@ -42,18 +42,30 @@ def ensure_valid_token():
     return True
 
 def main():
-    # Step 0 - Ensure we have a valid access token
+    # Step 0 - Validate configuration
+    try:
+        config = load_config()
+        validate_config(config)
+    except ValueError as e:
+        print_error(f"Configuration error: {e}")
+        print_error("Please check your config.json file")
+        return
+    except Exception as e:
+        print_error(f"Failed to load configuration: {e}")
+        return
+    
+    # Step 1 - Ensure we have a valid access token
     if not ensure_valid_token():
         print_error("Cannot proceed without valid access token. Exiting.")
         return
     
-    # Step 1 - Fetch projects
+    # Step 2 - Fetch projects
     run_dir, projects_path, projects = dump_projects(output_root="results")
 
-    # Step 2 - Fetch todos metadata (with URLs and IDs)
+    # Step 3 - Fetch todos metadata (with URLs and IDs)
     todos_path, todos = fetch_all_todos_from_dump(projects, run_dir)
 
-    # Step 3 - Export live to Jira CSV (fetches comments inline) + Download attachments
+    # Step 4 - Export live to Jira CSV (fetches comments inline) + Download attachments
     format_for_jira_live(todos, run_dir, download_attachments=True)
 
 if __name__ == "__main__":

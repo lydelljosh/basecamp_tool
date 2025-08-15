@@ -76,9 +76,14 @@ def get_token():
     print(f"Opening browser for authorization...\nIf it doesn't open, manually visit:\n{auth_url}")
     try:
         webbrowser.open(auth_url)
-    except:
-        import subprocess
-        subprocess.run(["start", auth_url], shell=True)
+    except Exception as e:
+        print_error(f"Failed to open browser automatically: {e}")
+        try:
+            import subprocess
+            subprocess.run(["start", auth_url], shell=True)
+        except Exception as e2:
+            print_error(f"Also failed to open via subprocess: {e2}")
+            print_error("Please manually open the URL above in your browser")
 
     class OAuthHandler(http.server.SimpleHTTPRequestHandler):
         def do_GET(self):

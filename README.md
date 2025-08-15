@@ -27,6 +27,9 @@ This Python-based utility extracts To-dos, comments, and attachments from Baseca
 - ✅ **Automatic token refresh** - Automatically refreshes expired OAuth tokens at startup
 - ✅ **Cross-platform compatibility** - Windows and macOS support with platform-specific fixes
 - ✅ **Comprehensive logging** - Detailed progress tracking and error reporting
+- ✅ **Attachment mapping** - Direct todo ID mapping for reliable attachment correlation
+- ✅ **Enhanced error handling** - Improved validation and graceful error recovery
+- ✅ **Configuration validation** - Validates required fields and warns about missing credentials
 
 ---
 
@@ -50,6 +53,9 @@ This Python-based utility extracts To-dos, comments, and attachments from Baseca
 - ✅ **Improved run directory creation** - Creates output directory even when projects fetch fails
 - ✅ **Added group support** - Now properly fetches and organizes todos within grouped lists
 - ✅ **Debug logging** - Comprehensive attachment detection and processing logs
+- ✅ **Basecamp Todo ID mapping** - Each CSV row includes unique todo ID for attachment correlation
+- ✅ **Robust error handling** - Fixed bare except clauses and added detailed error messages
+- ✅ **Configuration validation** - Validates required config fields at startup
 
 ---
 
@@ -139,11 +145,12 @@ python main.py
 ```
 
 This runs the complete workflow:
-1. **Refresh token** - Automatically refreshes expired OAuth tokens
-2. **Dump projects** - Fetches all project metadata
-3. **Fetch todos** - Retrieves todos with group organization and details (includes completed items if configured)
-4. **Export to Jira CSV** - Creates a formatted CSV file for import
-5. **Download attachments** - Downloads bc-attachments, images, and files using session authentication
+1. **Validate configuration** - Checks required fields and warns about missing credentials
+2. **Refresh token** - Automatically refreshes expired OAuth tokens
+3. **Dump projects** - Fetches all project metadata
+4. **Fetch todos** - Retrieves todos with group organization and details (includes completed items if configured)
+5. **Export to Jira CSV** - Creates a formatted CSV file with Basecamp Todo IDs for import
+6. **Download attachments** - Downloads bc-attachments, images, and files using session authentication
 
 ### Output Location
 Files are saved in timestamped folders: `results/run_YYYYMMDD_HHMMSS/`
@@ -186,6 +193,7 @@ Jira-compatible CSV with columns:
 - Attachments (with download URLs)
 - Downloaded Files (local paths of downloaded attachments)
 - App URL (link back to Basecamp)
+- **Basecamp Todo ID** (for reliable attachment mapping)
 
 ### `attachments/`
 Downloaded attachment files organized by todo ID:
@@ -193,6 +201,7 @@ Downloaded attachment files organized by todo ID:
 - Files include bc-attachments, images, and main todo attachments
 - Preserves original filenames where possible
 - Source tracking in CSV shows origin (description, comment, main attachment)
+- **Direct mapping** via Basecamp Todo ID enables reliable import to external systems
 
 ---
 
@@ -237,6 +246,27 @@ python -c "from auth import get_token; get_token()"
 **Windows path/encoding issues**: The tool includes Windows-specific fixes, but ensure your Python installation supports UTF-8.
 
 **Cross-platform token sync**: Tokens are automatically refreshed and synced across different machines running the script.
+
+---
+
+## 🔒 Security Considerations
+
+### Configuration Security
+- **config.json contains sensitive data** - OAuth tokens, account IDs, and session credentials
+- **Already gitignored** - The file is excluded from version control by default
+- **Keep credentials private** - Never commit config.json or share tokens publicly
+- **Regular token refresh** - OAuth tokens are automatically refreshed to limit exposure
+
+### Best Practices
+- ✅ **Use environment variables** for CI/CD deployments instead of config.json
+- ✅ **Limit account access** - Use dedicated Basecamp accounts with minimal required permissions
+- ✅ **Regular credential rotation** - Periodically regenerate API tokens and passwords
+- ✅ **Secure storage** - Store config.json in encrypted directories on shared systems
+
+### Authentication Methods
+- **OAuth tokens** - Primary authentication method, automatically managed
+- **Session credentials** - Username/password for attachment downloads only
+- **API tokens** - Stored securely in config.json, refreshed automatically
 
 ---
 
