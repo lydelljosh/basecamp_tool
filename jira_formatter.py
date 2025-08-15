@@ -41,7 +41,7 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
         writer = csv.DictWriter(csvfile, fieldnames=[
             "Project", "List", "Group", "Todo Title", "Description", "Assignees",
             "Created By", "Due Date", "Completed", "Comments",
-            "Attachments", "Downloaded Files", "App URL"
+            "Attachments", "Downloaded Files", "App URL", "Basecamp Todo ID"
         ])
         writer.writeheader()
 
@@ -218,7 +218,8 @@ def format_for_jira_live(todos_data: dict, run_dir: str, download_attachments: b
                         "Comments": sanitize_csv_field(clean_special_characters(formatted_comments)),
                         "Attachments": sanitize_csv_field(clean_special_characters(" | ".join(attachment_lines))),
                         "Downloaded Files": sanitize_csv_field(clean_special_characters(" | ".join(downloaded_info))),
-                        "App URL": detail.get("app_url", "")
+                        "App URL": detail.get("app_url", ""),
+                        "Basecamp Todo ID": str(todo_id)
                     })
 
     print_success(f"Exported Jira CSV to {output_path}")
