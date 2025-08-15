@@ -160,7 +160,7 @@ class JiraAttachmentUploader:
         return uploaded_count
     
     def get_todo_label_mapping(self, csv_path: str) -> Dict[str, str]:
-        """Extract Todo ID to label mapping from CSV"""
+        """Extract Todo ID to todolist ID (label) mapping from CSV"""
         mapping = {}
         
         try:
@@ -170,14 +170,25 @@ class JiraAttachmentUploader:
                 for row in reader:
                     todo_id = row.get('Basecamp Todo ID', '').strip()
                     
-                    # Create label from List name (assuming you used this for labels)
-                    list_name = row.get('List', '').strip()
-                    if list_name and todo_id:
-                        # Convert list name to label format (replace spaces/special chars)
-                        label = list_name.replace(' ', '_').replace('-', '_').lower()
-                        mapping[todo_id] = label
+                    # You mentioned todolist ID = jira label
+                    # We need to extract todolist ID from the CSV data
+                    # This might be in the URL or we need to add it to the CSV
+                    
+                    app_url = row.get('App URL', '').strip()
+                    if app_url and todo_id:
+                        # Extract todolist ID from Basecamp URL
+                        # URL format: https://3.basecamp.com/ACCOUNT/buckets/BUCKET/todolists/TODOLIST_ID/todos/TODO_ID
+                        try:
+                            parts = app_url.split('/todolists/')
+                            if len(parts) > 1:
+                                todolist_id = parts[1].split('/')[0]
+                                mapping[todo_id] = todolist_id
+                            else:
+                                print_error(f"Could not extract todolist ID from URL: {app_url}")
+                        except Exception as e:
+                            print_error(f"Failed to parse URL for todo {todo_id}: {e}")
                         
-            print_success(f"Loaded {len(mapping)} Todo ID to Label mappings from CSV")
+            print_success(f"Loaded {len(mapping)} Todo ID to Todolist ID (label) mappings from CSV")
             return mapping
             
         except Exception as e:
@@ -201,18 +212,18 @@ class JiraAttachmentUploader:
         total_issues_processed = 0
         
         # Process each Todo ID
-        for todo_id, expected_label in mapping.items():
-            print_success(f"\nProcessing Todo ID {todo_id} (expected label: {expected_label})")
+        for todo_id, todolist_id in mapping.items():
+            print_success(f"\nProcessing Todo ID {todo_id} (todolist ID/label: {todolist_id})")
             
-            # Search for Jira issues with this label
-            issues = self.search_issues_by_label(expected_label)
+            # Search for Jira issues with this label (todolist ID)
+            issues = self.search_issues_by_label(todolist_id)
             
             if not issues:
-                print_error(f"No Jira issues found with label '{expected_label}' for Todo ID {todo_id}")
+                print_error(f"No Jira issues found with label '{todolist_id}' for Todo ID {todo_id}")
                 continue
             
             if len(issues) > 1:
-                print_error(f"Multiple issues found with label '{expected_label}': {[issue['key'] for issue in issues]}")
+                print_error(f"Multiple issues found with label '{todolist_id}': {[issue['key'] for issue in issues]}")
                 print_error(f"Using first issue: {issues[0]['key']}")
             
             issue = issues[0]
