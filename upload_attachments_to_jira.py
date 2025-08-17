@@ -91,6 +91,52 @@ class JiraAttachmentUploader:
             print_error(f"Failed to search issues by label '{label}': {e}")
             return []
     
+    def update_issue_status(self, issue_key: str, status: str) -> bool:
+        """Update the status of a Jira issue"""
+        try:
+            # First get available transitions for this issue
+            url = f"{self.base_url}/rest/api/3/issue/{issue_key}/transitions"
+            response = self.session.get(url)
+            
+            if response.status_code != 200:
+                print_error(f"Failed to get transitions for {issue_key}: {response.status_code}")
+                return False
+            
+            transitions = response.json().get('transitions', [])
+            
+            # Find the transition to the desired status
+            target_transition = None
+            for transition in transitions:
+                if transition['to']['name'].lower() == status.lower():
+                    target_transition = transition
+                    break
+            
+            if not target_transition:
+                # List available transitions for debugging
+                available = [t['to']['name'] for t in transitions]
+                print_error(f"Status '{status}' not available for {issue_key}. Available: {available}")
+                return False
+            
+            # Execute the transition
+            transition_data = {
+                "transition": {
+                    "id": target_transition['id']
+                }
+            }
+            
+            response = self.session.post(url, json=transition_data)
+            
+            if response.status_code == 204:
+                print_success(f"Updated {issue_key} status to '{status}'")
+                return True
+            else:
+                print_error(f"Failed to update {issue_key} status: {response.status_code} - {response.text}")
+                return False
+                
+        except Exception as e:
+            print_error(f"Exception updating {issue_key} status: {e}")
+            return False
+
     def upload_attachment(self, issue_key: str, file_path: str) -> bool:
         """Upload a single attachment to a Jira issue"""
         try:
@@ -234,6 +280,76 @@ class JiraAttachmentUploader:
         
         return True
 
+    def update_completed_todos(self, csv_path: str, target_status: str = "Done", dry_run: bool = False) -> bool:
+        """Update Jira status for completed todos based on CSV"""
+        
+        if not self.test_connection():
+            print_error("Cannot proceed - Jira connection failed")
+            return False
+        
+        # Read CSV and find completed todos
+        completed_todos = {}
+        
+        try:
+            with open(csv_path, 'r', encoding='utf-8') as csvfile:
+                reader = csv.DictReader(csvfile)
+                
+                for row in reader:
+                    todo_id = row.get('Basecamp Todo ID', '').strip()
+                    completed = row.get('Completed', '').strip().lower()
+                    
+                    # Check if todo is marked as completed
+                    if todo_id and completed in ['true', '1', 'yes']:
+                        completed_todos[todo_id] = todo_id  # Use Todo ID as Jira label
+                        
+            print_success(f"Found {len(completed_todos)} completed todos in CSV")
+            
+        except Exception as e:
+            print_error(f"Failed to read CSV for completed todos: {e}")
+            return False
+        
+        if not completed_todos:
+            print_success("No completed todos found to update")
+            return True
+        
+        total_updated = 0
+        
+        # Process each completed todo
+        for todo_id, jira_label in completed_todos.items():
+            print_success(f"\nProcessing completed Todo ID {todo_id} (Jira label: {jira_label})")
+            
+            # Search for Jira issues with this label
+            issues = self.search_issues_by_label(jira_label)
+            
+            if not issues:
+                print_error(f"No Jira issues found with label '{jira_label}' for completed Todo ID {todo_id}")
+                continue
+            
+            if len(issues) > 1:
+                print_error(f"Multiple issues found with label '{jira_label}': {[issue['key'] for issue in issues]}")
+                print_error(f"Using first issue: {issues[0]['key']}")
+            
+            issue = issues[0]
+            issue_key = issue['key']
+            
+            if dry_run:
+                print_success(f"DRY RUN: Would update {issue_key} status to '{target_status}'")
+                continue
+            
+            # Update the issue status
+            if self.update_issue_status(issue_key, target_status):
+                total_updated += 1
+            else:
+                print_error(f"Failed to update {issue_key} status")
+        
+        if dry_run:
+            print_success(f"\nDRY RUN COMPLETE: Would update {len(completed_todos)} issues to '{target_status}'")
+        else:
+            print_success(f"\nSTATUS UPDATE COMPLETE:")
+            print_success(f"Updated {total_updated}/{len(completed_todos)} issues to '{target_status}'")
+        
+        return True
+
 def main():
     """Command line interface"""
     import argparse
@@ -243,6 +359,8 @@ def main():
     parser.add_argument('--attachments', help='Path to attachments directory')
     parser.add_argument('--dry-run', action='store_true', help='Show what would be uploaded without actually uploading')
     parser.add_argument('--test-connection', action='store_true', help='Test Jira connection and exit')
+    parser.add_argument('--update-completed', action='store_true', help='Update status of completed todos in Jira')
+    parser.add_argument('--target-status', default='Done', help='Target status for completed todos (default: Done)')
     
     args = parser.parse_args()
     
@@ -254,6 +372,24 @@ def main():
                 print_success("Jira connection test passed!")
             else:
                 print_error("Jira connection test failed!")
+            return
+        
+        # Handle status update for completed todos
+        if args.update_completed:
+            if not args.csv:
+                print_error("--csv argument is required for status update operations")
+                return
+            
+            if not os.path.exists(args.csv):
+                print_error(f"CSV file not found: {args.csv}")
+                return
+            
+            success = uploader.update_completed_todos(args.csv, args.target_status, args.dry_run)
+            
+            if success:
+                print_success("Status update process completed successfully!")
+            else:
+                print_error("Status update process failed!")
             return
         
         # Validate required arguments for upload operations
