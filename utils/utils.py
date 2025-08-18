@@ -12,6 +12,22 @@ def load_config():
             return json.load(f)
     return {}
 
+def validate_config(config):
+    """Validate configuration has required fields"""
+    required_fields = ['client_id', 'client_secret']
+    missing = [field for field in required_fields if not config.get(field)]
+    
+    if missing:
+        raise ValueError(f"Missing required config fields: {missing}")
+    
+    # Check for session auth fields if needed
+    if config.get('username') and not config.get('password'):
+        print_error("Warning: username provided but password missing - session auth may fail")
+    elif config.get('password') and not config.get('username'):
+        print_error("Warning: password provided but username missing - session auth may fail")
+    
+    return True
+
 def get_account_id():
     config = load_config()
     return config.get("account_id")
@@ -59,7 +75,8 @@ def clean_special_characters(text):
                     cleaned += ascii_equivalent
                 else:
                     cleaned += ' '
-            except:
+            except Exception:
+                # If Unicode normalization fails, replace with space
                 cleaned += ' '
     
     # Only clean up excessive whitespace (3+ spaces), preserve normal spacing
@@ -77,14 +94,11 @@ def sanitize_csv_field(text):
     # Pattern matches base64 strings that are typically very long
     cleaned = re.sub(r'[A-Za-z0-9+/]{100,}={0,2}', '[base64 data removed]', text)
     
-    # Replace any newlines (both \n and \r\n) with spaces for CSV compatibility
-    # This prevents Windows CSV readers from breaking rows on internal newlines
-    cleaned = re.sub(r'\r?\n', ' ', cleaned)
+    # Keep newlines for better readability - CSV fields are properly quoted
+    # Only clean up excessive whitespace (3+ spaces), preserve normal spacing and line breaks
+    cleaned = re.sub(r' {3,}', ' ', cleaned)
     
-    # Clean up multiple consecutive spaces
-    cleaned = re.sub(r' {2,}', ' ', cleaned)
-    
-    # Trim leading/trailing spaces
+    # Trim leading/trailing spaces but preserve internal formatting
     cleaned = cleaned.strip()
     
     # Limit field length to prevent extremely long text from breaking CSV readers
