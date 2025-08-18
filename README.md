@@ -30,6 +30,8 @@ This Python-based utility extracts To-dos, comments, and attachments from Baseca
 - ✅ **Attachment mapping** - Direct todo ID mapping for reliable attachment correlation
 - ✅ **Enhanced error handling** - Improved validation and graceful error recovery
 - ✅ **Configuration validation** - Validates required fields and warns about missing credentials
+- ✅ **Jira API integration** - Automated attachment uploads and status management via Jira REST API
+- ✅ **Status synchronization** - Update Jira issue status based on Basecamp completion status
 
 ---
 
@@ -57,6 +59,13 @@ This Python-based utility extracts To-dos, comments, and attachments from Baseca
 - ✅ **Robust error handling** - Fixed bare except clauses and added detailed error messages
 - ✅ **Configuration validation** - Validates required config fields at startup
 
+### Jira Integration
+- ✅ **Automated attachment uploads** - Upload files from todo folders to Jira issues via API
+- ✅ **Label-based mapping** - Use Basecamp Todo IDs as Jira labels for precise issue targeting
+- ✅ **Status synchronization** - Automatically update Jira issue status for completed todos
+- ✅ **Dry-run capabilities** - Preview operations before executing for safe testing
+- ✅ **Flexible status mapping** - Support custom Jira status transitions (Done, Closed, etc.)
+
 ---
 
 ## 📂 Project Structure
@@ -70,11 +79,12 @@ basecamp_tool/
 ├── dump.py                  # Dumps all project metadata
 ├── fetch.py                 # Fetches todo and list data with group support
 ├── jira_formatter.py        # Formats data into Jira-compatible CSV with attachment downloads
+├── upload_attachments_to_jira.py  # Jira API integration for attachments and status updates
 ├── utils/
 │   ├── basecamp_api.py      # API wrappers with retry logic
 │   ├── utils.py             # Utility functions (logging, text cleaning, constants)
 │   └── helpers.py           # URL parsing helpers
-├── config.json              # OAuth tokens and configuration
+├── config.json              # OAuth tokens and Jira API configuration
 ├── .gitignore               # Git exclusions
 └── results/
     └── run_YYYYMMDD_HHMMSS/ # Timestamped output folders
@@ -119,13 +129,25 @@ pip install requests beautifulsoup4
   "redirect_uri": "http://localhost:8888/callback",
   "include_completed": true,
   "username": "your-basecamp-email@example.com",
-  "password": "your-basecamp-password"
+  "password": "your-basecamp-password",
+  "jira": {
+    "url": "https://your-domain.atlassian.net",
+    "email": "your-email@company.com",
+    "api_token": "YOUR_JIRA_API_TOKEN",
+    "project_key": "YOUR_PROJECT_KEY",
+    "project_name": "Your Project Name",
+    "default_issue_type": "Bug",
+    "default_priority": "Medium",
+    "test_mode": true,
+    "test_limit": 5
+  }
 }
 ```
 
 **Configuration Options:**
 - `include_completed`: Set to `false` to exclude archived/completed todolists and todos (default: `true`)
 - `username` & `password`: Required for session-based attachment downloads (used only for file authentication, not stored elsewhere)
+- `jira`: Jira Cloud API configuration for automated integration (optional)
 
 5. Get your OAuth tokens:
 ```bash
@@ -134,6 +156,20 @@ python -c "from auth import get_token; get_token()"
 This will:
 - Open your browser for Basecamp authentication
 - Automatically save your access token and account ID to `config.json`
+
+### Jira Setup (Optional)
+
+For automated Jira integration, you'll need:
+
+1. **Jira Cloud instance** with admin access
+2. **API Token**: Generate at https://id.atlassian.com/manage-profile/security/api-tokens
+3. **Project Key**: The key of your target Jira project (e.g., "BMT")
+
+**Jira Configuration Steps:**
+1. Add your Jira details to the `jira` section in `config.json`
+2. Create a test project or use existing project
+3. During CSV import, map `Basecamp Todo ID` column to Labels field
+4. This enables the automated attachment and status sync features
 
 ---
 
@@ -152,20 +188,71 @@ This runs the complete workflow:
 5. **Export to Jira CSV** - Creates a formatted CSV file with Basecamp Todo IDs for import
 6. **Download attachments** - Downloads bc-attachments, images, and files using session authentication
 
-### Output Location
-Files are saved in timestamped folders: `results/run_YYYYMMDD_HHMMSS/`
+### Jira Integration Commands
 
-### Manual Token Refresh
-If you need to manually refresh your OAuth token:
+After running the basic export, use these commands for Jira automation:
+
+#### **Test Jira API Connection**
 ```bash
-python refresh_token.py
+python upload_attachments_to_jira.py --test-connection
 ```
 
-### Authentication Setup
-If you need to re-authenticate or set up for the first time:
+#### **Upload Attachments to Jira Issues**
 ```bash
+# Dry run first (recommended)
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --attachments results/run_*/attachments --dry-run
+
+# Actual upload
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --attachments results/run_*/attachments
+```
+
+#### **Update Status for Completed Todos**
+```bash
+# Test what would be updated
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --update-completed --dry-run
+
+# Update completed todos to "Done" status
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --update-completed
+
+# Update to custom status (e.g., "Closed")
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --update-completed --target-status "Closed"
+```
+
+### Manual Token Management
+```bash
+# Manual token refresh
+python refresh_token.py
+
+# Re-authenticate completely
 python -c "from auth import get_token; get_token()"
 ```
+
+### Complete Workflow Example
+
+**1. Export data from Basecamp:**
+```bash
+python main.py
+```
+
+**2. Import CSV to Jira (manual step):**
+- Use the generated `todos_jira.csv` file
+- Import via Jira's CSV import feature
+- Ensure Basecamp Todo IDs are added as labels during import
+
+**3. Upload attachments automatically:**
+```bash
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --attachments results/run_*/attachments --dry-run
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --attachments results/run_*/attachments
+```
+
+**4. Update completed todo status:**
+```bash
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --update-completed --dry-run
+python upload_attachments_to_jira.py --csv results/run_*/todos_jira.csv --update-completed
+```
+
+### Output Location
+Files are saved in timestamped folders: `results/run_YYYYMMDD_HHMMSS/`
 
 ---
 
@@ -247,15 +334,40 @@ python -c "from auth import get_token; get_token()"
 
 **Cross-platform token sync**: Tokens are automatically refreshed and synced across different machines running the script.
 
+### Jira Integration Issues
+
+**"Failed to connect to Jira API"**: Check your Jira configuration:
+```bash
+python upload_attachments_to_jira.py --test-connection
+```
+- Verify API token is correct and not expired
+- Ensure email address matches your Jira account
+- Check Jira URL format (https://domain.atlassian.net)
+
+**"No Jira issues found with label"**: The label mapping failed:
+- Ensure you imported CSV with Basecamp Todo ID as labels
+- Check that labels were properly created during Jira import
+- Verify project key matches your target project
+
+**"Status not available"**: The target status doesn't exist or isn't accessible:
+- Check available status transitions in your Jira workflow
+- Use `--target-status "Status Name"` to specify exact status name
+- Ensure your account has permission to transition issues
+
+**"Multiple issues found with label"**: One Todo ID matches multiple Jira issues:
+- Check for duplicate labels in your Jira project
+- The script will use the first match found
+
 ---
 
 ## 🔒 Security Considerations
 
 ### Configuration Security
-- **config.json contains sensitive data** - OAuth tokens, account IDs, and session credentials
+- **config.json contains sensitive data** - OAuth tokens, account IDs, session credentials, and Jira API tokens
 - **Already gitignored** - The file is excluded from version control by default
 - **Keep credentials private** - Never commit config.json or share tokens publicly
 - **Regular token refresh** - OAuth tokens are automatically refreshed to limit exposure
+- **Jira API token security** - Store API tokens securely, rotate regularly
 
 ### Best Practices
 - ✅ **Use environment variables** for CI/CD deployments instead of config.json
@@ -264,9 +376,10 @@ python -c "from auth import get_token; get_token()"
 - ✅ **Secure storage** - Store config.json in encrypted directories on shared systems
 
 ### Authentication Methods
-- **OAuth tokens** - Primary authentication method, automatically managed
+- **OAuth tokens** - Primary authentication method for Basecamp API, automatically managed
 - **Session credentials** - Username/password for attachment downloads only
-- **API tokens** - Stored securely in config.json, refreshed automatically
+- **Jira API tokens** - For Jira Cloud integration, generate at Atlassian Account Security
+- **API tokens** - All tokens stored securely in config.json, refresh when possible
 
 ---
 
